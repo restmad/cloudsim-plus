@@ -266,8 +266,7 @@ public class UtilizationModelDynamic extends UtilizationModelAbstract {
      * @return
      */
     public final UtilizationModelDynamic setUtilizationUpdateFunction(final Function<UtilizationModelDynamic, Double> utilizationUpdateFunction) {
-        Objects.requireNonNull(utilizationUpdateFunction);
-        this.utilizationUpdateFunction = utilizationUpdateFunction;
+        this.utilizationUpdateFunction = Objects.requireNonNull(utilizationUpdateFunction);
         return this;
     }
 }

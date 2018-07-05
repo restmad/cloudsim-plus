@@ -12,11 +12,13 @@ import org.cloudbus.cloudsim.core.*;
 import org.cloudbus.cloudsim.core.events.SimEvent;
 import org.cloudbus.cloudsim.datacenters.Datacenter;
 import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletScheduler;
+import org.cloudbus.cloudsim.util.Conversion;
 import org.cloudbus.cloudsim.utilizationmodels.UtilizationModel;
 import org.cloudbus.cloudsim.vms.Vm;
 import org.cloudsimplus.autoscaling.VerticalVmScaling;
 import org.cloudsimplus.listeners.DatacenterBrokerEventInfo;
 import org.cloudsimplus.listeners.EventListener;
+import org.cloudsimplus.traces.google.GoogleTaskEventsTraceReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -193,7 +195,6 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
 
         vmDestructionDelayFunction = DEFAULT_VM_DESTRUCTION_DELAY_FUNCTION;
     }
-
 
     /**
      * Sets the default dummy policies for {@link #datacenterSupplier},
@@ -441,6 +442,9 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
             case CloudSimTags.CLOUDLET_READY:
                 processCloudletReady(ev);
             break;
+            case CloudSimTags.CLOUDLET_UPDATE_ATTRIBUTES:
+                processCloudletAttributesChange(ev);
+            break;
             case CloudSimTags.CLOUDLET_PAUSE:
                 processCloudletPause(ev);
             break;
@@ -457,8 +461,64 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
                 shutdownEntity();
             break;
             default:
-                logger.trace("{}: {}: Unknown event {} received", getSimulation().clock(), this, ev.getTag());
+                logger.trace("{}: {}: Unknown event {} received.", getSimulation().clock(), this, ev.getTag());
             break;
+        }
+    }
+
+    /**
+     * Process a request to change the attributes of a Cloudlet.
+     * @param ev the event received where the data attribute contains
+     *           a clone of the Cloudlet that the attributes
+     *           have to be changed.
+     *           Using the ID of the clone, the actual Cloudlet
+     *           instance can be found.
+     */
+    private void processCloudletAttributesChange(final SimEvent ev){
+        final Cloudlet clone = (Cloudlet)ev.getData();
+        cloudletSubmittedList.stream()
+                             .filter(cloudlet -> cloudlet.getId() == clone.getId()).findFirst()
+                             .ifPresent(cloudlet -> changeCloudletAttributes(cloudlet, clone));
+    }
+
+    /**
+     * Changes the attributes of a Cloudlet using a clone containing the values to
+     * be changed in the given Cloudlet.
+     * @param cloudlet the Cloudlet to change its attributes
+     * @param clone the clone containing the values to change in the given Cloudlet
+     */
+    private void changeCloudletAttributes(final Cloudlet cloudlet, final Cloudlet clone){
+        final StringBuilder sb = new StringBuilder();
+        /* The output size doesn't always have a relation with file size.
+         * This way, if the file size is changed, we don't change
+         * the output size. This may be performed by the researcher if he/she needs.*/
+        if(clone.getFileSize() != cloudlet.getFileSize()){
+            sb.append("file size: ")
+              .append(Conversion.bytesToSuitableUnit(cloudlet.getFileSize())).append(" -> ")
+              .append(Conversion.bytesToSuitableUnit(clone.getFileSize())).append(" | ");
+            cloudlet.setFileSize(clone.getFileSize());
+        }
+        if(clone.getNumberOfPes() != cloudlet.getNumberOfPes()){
+            sb.append("PEs: ")
+              .append(cloudlet.getNumberOfPes()).append(" -> ")
+              .append(clone.getNumberOfPes()).append(" | ");
+            cloudlet.setNumberOfPes(clone.getNumberOfPes());
+        }
+        if(clone.getUtilizationOfCpu() != cloudlet.getUtilizationOfCpu()){
+            sb.append("CPU Utilization: ")
+              .append(String.format("%.2f", cloudlet.getUtilizationOfCpu()*100)).append("% -> ")
+              .append(String.format("%.2f", clone.getUtilizationOfCpu()*100)).append("% | ");
+            cloudlet.setUtilizationModelCpu(clone.getUtilizationModelCpu());
+        }
+        if(clone.getUtilizationOfRam() != cloudlet.getUtilizationOfRam()){
+            sb.append("RAM Utilization: ")
+              .append(String.format("%.2f", cloudlet.getUtilizationOfRam()*100)).append("% -> ")
+              .append(String.format("%.2f", clone.getUtilizationOfRam()*100)).append("% | ");
+            cloudlet.setUtilizationModelRam(clone.getUtilizationModelRam());
+        }
+
+        if(sb.length() > 0){
+            logger.trace("{}: {}: {} attributes updated: {}",  getSimulation().clock(), getClass().getSimpleName(), cloudlet, sb);
         }
     }
 
@@ -474,16 +534,21 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
      */
     private void processCloudletReady(final SimEvent ev){
         final Cloudlet cloudlet = (Cloudlet)ev.getData();
-        cloudlet.setStatus(Cloudlet.Status.READY);
+        if(cloudlet.getStatus() == Cloudlet.Status.PAUSED)
+            logger.info("{}: {}: Request to resume {} execution received.", getSimulation().clock(), this, cloudlet);
+        else logger.info("{}: {}: Request to start executing {} received.", getSimulation().clock(), this, cloudlet);
+        cloudlet.getVm().getCloudletScheduler().cloudletReady(cloudlet);
     }
 
     private void processCloudletPause(final SimEvent ev){
         final Cloudlet cloudlet = (Cloudlet)ev.getData();
+        logger.info("{}: {}: Request to deschedule (pause) {} received.", getSimulation().clock(), this, cloudlet);
         cloudlet.getVm().getCloudletScheduler().cloudletPause(cloudlet);
     }
 
     private void processCloudletCancel(final SimEvent ev){
         final Cloudlet cloudlet = (Cloudlet)ev.getData();
+        logger.info("{}: {}: Request to cancel {} execution received.", getSimulation().clock(), this, cloudlet);
         cloudlet.getVm().getCloudletScheduler().cloudletCancel(cloudlet);
     }
 
@@ -491,10 +556,10 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
      * Process the request to finish a Cloudlet with a indefinite length,
      * setting its length as the current number of processed MI.
      * @param ev the event data
-     * @todo The method is in implementation process
      */
     private void processCloudletFinish(final SimEvent ev){
         final Cloudlet cloudlet = (Cloudlet)ev.getData();
+        logger.info("{}: {}: Request to finish running {} received.", getSimulation().clock(), this, cloudlet);
         /*If the executed length is zero, it means the cloudlet processing was not updated yet.
         * This way, calls the method to update the Cloudlet's processing.*/
         if(cloudlet.getFinishedLengthSoFar() == 0){

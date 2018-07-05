@@ -14,6 +14,7 @@ import org.cloudbus.cloudsim.hosts.Host;
 import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletScheduler;
 import org.cloudbus.cloudsim.vms.Vm;
 import org.cloudsimplus.autoscaling.VerticalVmScaling;
+import org.cloudsimplus.traces.google.GoogleTaskEventsTraceReader;
 
 /**
  * Contains various static command tags that indicate a type of action that
@@ -143,7 +144,7 @@ public final class CloudSimTags {
     public static final int CLOUDLET_RESUME_ACK = BASE + 22;
 
     /**
-     * A Cloudlet is ready to start executing inside a VM.
+     * Request a Cloudlet to be set as ready to start executing inside a VM.
      * This event is sent by a DatacenterBroker to itself to define the time when
      * a specific Cloudlet should start executing.
      * This tag is commonly used when Cloudlets are created
@@ -159,14 +160,14 @@ public final class CloudSimTags {
     public static final int CLOUDLET_READY = BASE + 23;
 
     /**
-     * Sets a Cloudlet as failed.
+     * Request a Cloudlet to be set as failed.
      * When an event of this type is sent, the {@link SimEvent#getData()}
      * must be a {@link Cloudlet} object.
      */
     public static final int CLOUDLET_FAIL = BASE + 24;
 
     /**
-     * Finishes a Cloudlet with an indefinite length (negative value) by
+     * Requests an indefinite-length Cloudlet (negative value) to be finished by
      * setting its length as the current number of processed MI.
      * When an event of this type is sent, the {@link SimEvent#getData()}
      * must be a {@link Cloudlet} object.
@@ -182,12 +183,24 @@ public final class CloudSimTags {
     public static final int CLOUDLET_FINISH = -(BASE + 25);
 
     /**
-     * Sets a Cloudlet as cancelled by the user or because
+     * Requests a Cloudlet to be cancelled.
+     * The Cloudlet can be cancelled under user request or because
      * another Cloudlet on which this one was dependent died.
      * When an event of this type is sent, the {@link SimEvent#getData()}
      * must be a {@link Cloudlet} object.
      */
     public static final int CLOUDLET_KILL = BASE + 26;
+
+    /**
+     * Request a Cloudlet to have its attributes changed.
+     * When an event of this type is sent, the {@link SimEvent#getData()}
+     * must be a clone of the {@link Cloudlet} to be updated,
+     * where the values of the attributes of the clone
+     * represents the values to be set to the original Cloudlet.
+     * Using the id of the clone, the actual Cloudlet to be updated
+     * can be found inside a broker.
+     */
+    public static final int CLOUDLET_UPDATE_ATTRIBUTES = BASE + 27;
 
     /**
      * Denotes a request to create a new VM in a {@link Datacenter}
