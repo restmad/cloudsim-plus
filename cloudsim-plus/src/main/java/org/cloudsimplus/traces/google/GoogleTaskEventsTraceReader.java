@@ -458,8 +458,7 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
 
         return cloudletLookupFunction
                 .apply(broker, taskEvent.getUniqueTaskId())
-                .map(cloudlet -> new CloudSimEvent(simulation, delay, broker, tag, cloudlet))
-                .map(simEvent -> addCloudletStatusChangeEvents(simEvent, taskEvent))
+                .map(cloudlet -> addCloudletStatusChangeEvents(new CloudSimEvent(simulation, delay, broker, tag, cloudlet), taskEvent))
                 .isPresent();
     }
 
@@ -473,7 +472,7 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
      *                  the status and the attributes to change in the Cloudlet
      * @return
      */
-    private boolean addCloudletStatusChangeEvents(final CloudSimEvent statusChangeSimEvt, final TaskEvent taskEvent){
+    private Cloudlet addCloudletStatusChangeEvents(final CloudSimEvent statusChangeSimEvt, final TaskEvent taskEvent){
         //Sends the event to change the Cloudlet status.
         cloudletStatusChangeEvents.add(statusChangeSimEvt);
         /*The actual Cloudlet that needs to have its status and/or attributes changed
@@ -498,22 +497,64 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
         clone.setId(cloudlet.getId());
 
         /*If some attribute of the Cloudlet that needs to be changed,
-        * sends a message requesting the change.*/
-        if(clone.getFileSize() != cloudlet.getFileSize() ||
-           clone.getNumberOfPes() != cloudlet.getNumberOfPes() ||
-           clone.getUtilizationOfCpu() != cloudlet.getUtilizationOfCpu() ||
-           clone.getUtilizationOfRam() != cloudlet.getUtilizationOfRam())
-        {
-            final CloudSimEvent attrsChangeSimEvt =
-                new CloudSimEvent(
-                    simulation, taskEvent.getTimestamp(),
-                    statusChangeSimEvt.getDestination(),
-                    CloudSimTags.CLOUDLET_UPDATE_ATTRIBUTES, clone);
-            //Sends the event to change the Cloudlet attributes
-            cloudletStatusChangeEvents.add(attrsChangeSimEvt);
+         * sends a message requesting the change.*/
+        if(!areCloudletAttributesDifferent(cloudlet, clone)){
+            return cloudlet;
         }
 
-        return true;
+        /*Defines a Runnable that will be executed when
+        * the message is processed by the broker to update the Cloudlet attributes.*/
+        final Runnable attributesUpdateRunnable = () -> {
+            final DatacenterBroker broker = cloudlet.getBroker();
+            final StringBuilder sb = new StringBuilder();
+            /* The output size doesn't always have a relation with file size.
+             * This way, if the file size is changed, we don't change
+             * the output size. This may be performed by the researcher if he/she needs.*/
+            if(clone.getFileSize() != cloudlet.getFileSize()){
+                sb.append("file size: ")
+                  .append(Conversion.bytesToSuitableUnit(cloudlet.getFileSize())).append(" -> ")
+                  .append(Conversion.bytesToSuitableUnit(clone.getFileSize())).append(" | ");
+                cloudlet.setFileSize(clone.getFileSize());
+            }
+            if(clone.getNumberOfPes() != cloudlet.getNumberOfPes()){
+                sb.append("PEs: ")
+                  .append(cloudlet.getNumberOfPes()).append(" -> ")
+                  .append(clone.getNumberOfPes()).append(" | ");
+                cloudlet.setNumberOfPes(clone.getNumberOfPes());
+            }
+            if(clone.getUtilizationOfCpu() != cloudlet.getUtilizationOfCpu()){
+                sb.append("CPU Utilization: ")
+                  .append(String.format("%.2f", cloudlet.getUtilizationOfCpu()*100)).append("% -> ")
+                  .append(String.format("%.2f", clone.getUtilizationOfCpu()*100)).append("% | ");
+                cloudlet.setUtilizationModelCpu(clone.getUtilizationModelCpu());
+            }
+            if(clone.getUtilizationOfRam() != cloudlet.getUtilizationOfRam()){
+                sb.append("RAM Utilization: ")
+                  .append(String.format("%.2f", cloudlet.getUtilizationOfRam()*100)).append("% -> ")
+                  .append(String.format("%.2f", clone.getUtilizationOfRam()*100)).append("% | ");
+                cloudlet.setUtilizationModelRam(clone.getUtilizationModelRam());
+            }
+            broker.logger.trace("{}: {}: {} attributes updated: {}", getSimulation().clock(), broker.getName(), cloudlet, sb);
+        };
+
+        /*The Runnable is the data of the event that is sent to the broker,
+        * this way, it will be executed only when the event is processed.*/
+        final CloudSimEvent attrsChangeSimEvt =
+            new CloudSimEvent(
+                simulation, taskEvent.getTimestamp(),
+                statusChangeSimEvt.getDestination(),
+                CloudSimTags.CLOUDLET_UPDATE_ATTRIBUTES, attributesUpdateRunnable);
+        //Sends the event to change the Cloudlet attributes
+        cloudletStatusChangeEvents.add(attrsChangeSimEvt);
+
+        return cloudlet;
+    }
+
+    private boolean areCloudletAttributesDifferent(final Cloudlet cloudlet1, final Cloudlet cloudlet2) {
+        return cloudlet2.getFileSize() != cloudlet1.getFileSize() ||
+               cloudlet2.getNumberOfPes() != cloudlet1.getNumberOfPes() ||
+               cloudlet2.getUtilizationOfCpu() != cloudlet1.getUtilizationOfCpu() ||
+               cloudlet2.getUtilizationOfRam() != cloudlet1.getUtilizationOfRam();
     }
 
     /**

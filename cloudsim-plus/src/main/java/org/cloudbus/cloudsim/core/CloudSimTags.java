@@ -194,11 +194,27 @@ public final class CloudSimTags {
     /**
      * Request a Cloudlet to have its attributes changed.
      * When an event of this type is sent, the {@link SimEvent#getData()}
-     * must be a clone of the {@link Cloudlet} to be updated,
-     * where the values of the attributes of the clone
-     * represents the values to be set to the original Cloudlet.
-     * Using the id of the clone, the actual Cloudlet to be updated
-     * can be found inside a broker.
+     * must be a {@link Runnable} that represents a function with no arguments
+     * and no return that will perform the Cloudlet attribute update.
+     * The Runnable most encapsulate everything needed to update
+     * the Cloudlet's attributes, including the Cloudlet
+     * which will be updated.
+     *
+     * <p>Since the logic to update the attributes of a Cloudlet
+     * can be totally customized according to the researcher needs,
+     * there is no standard way to perform such an operation.
+     * As an example, you may want to reduce by half
+     * the number of PEs required by a Cloudlet of list of Cloudlets at a given time.
+     * This way, the Runnable function may be defined as a Lambda Expression as follows.
+     * Realize the {@code cloudletList} is considered to be accessible anywhere in the surrounding scope.
+     * </p>
+     *
+     * <pre>
+     * {@code Runnable runnable = () -> cloudletList.forEach(cloudlet -> cloudlet.setNumberOfPes(cloudlet.getNumberOfPes()/2));}
+     * </pre>
+     *
+     * <p>This way, the {@code runnable} variable can be set as the data for the event to be sent
+     * with this tag.</p>
      */
     public static final int CLOUDLET_UPDATE_ATTRIBUTES = BASE + 27;
 

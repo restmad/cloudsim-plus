@@ -12,15 +12,12 @@ import org.cloudbus.cloudsim.core.*;
 import org.cloudbus.cloudsim.core.events.SimEvent;
 import org.cloudbus.cloudsim.datacenters.Datacenter;
 import org.cloudbus.cloudsim.schedulers.cloudlet.CloudletScheduler;
-import org.cloudbus.cloudsim.util.Conversion;
 import org.cloudbus.cloudsim.utilizationmodels.UtilizationModel;
 import org.cloudbus.cloudsim.vms.Vm;
 import org.cloudsimplus.autoscaling.VerticalVmScaling;
 import org.cloudsimplus.listeners.DatacenterBrokerEventInfo;
 import org.cloudsimplus.listeners.EventListener;
 import org.cloudsimplus.traces.google.GoogleTaskEventsTraceReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Function;
@@ -36,7 +33,6 @@ import static java.util.Objects.requireNonNull;
  * @author Manoel Campos da Silva Filho
  */
 public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements DatacenterBroker {
-    private static final Logger logger = LoggerFactory.getLogger(DatacenterBrokerAbstract.class.getSimpleName());
 
     /**
      * A default {@link Function} which always returns {@link #DEFAULT_VM_DESTRUCTION_DELAY} to indicate that any VM should not be
@@ -442,8 +438,12 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
             case CloudSimTags.CLOUDLET_READY:
                 processCloudletReady(ev);
             break;
+            /* The data of such a kind of event is a Runnable that has all
+             * the logic to update the Cloudlet's attributes.
+             * This way, it will be run to perform such an update.
+             * Check the documentation of the tag below for details.*/
             case CloudSimTags.CLOUDLET_UPDATE_ATTRIBUTES:
-                processCloudletAttributesChange(ev);
+                ((Runnable) ev.getData()).run();
             break;
             case CloudSimTags.CLOUDLET_PAUSE:
                 processCloudletPause(ev);
@@ -464,70 +464,6 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
                 logger.trace("{}: {}: Unknown event {} received.", getSimulation().clock(), this, ev.getTag());
             break;
         }
-    }
-
-    /**
-     * Process a request to change the attributes of a Cloudlet.
-     * @param ev the event received where the data attribute contains
-     *           a clone of the Cloudlet that the attributes
-     *           have to be changed.
-     *           Using the ID of the clone, the actual Cloudlet
-     *           instance can be found.
-     */
-    private void processCloudletAttributesChange(final SimEvent ev) {
-        final Cloudlet clone = (Cloudlet) ev.getData();
-        final boolean isNotPresent = !cloudletSubmittedList.stream()
-            .filter(cloudlet -> cloudlet.getId() == clone.getId()).findFirst()
-            .map(cloudlet -> changeCloudletAttributes(cloudlet, clone))
-            .isPresent();
-
-        if(isNotPresent){
-            logger.warn("{}: {}: Request to update {} attributes received but the Cloudlet was not found.",  getSimulation().clock(), getName(), clone);
-        }
-    }
-
-    /**
-     * Changes the attributes of a Cloudlet using a clone containing the values to
-     * be changed in the given Cloudlet.
-     * @param cloudlet the Cloudlet to change its attributes
-     * @param clone the clone containing the values to change in the given Cloudlet
-     * @return the same given Cloudlet
-     */
-    private Cloudlet changeCloudletAttributes(final Cloudlet cloudlet, final Cloudlet clone){
-        final StringBuilder sb = new StringBuilder();
-        /* The output size doesn't always have a relation with file size.
-         * This way, if the file size is changed, we don't change
-         * the output size. This may be performed by the researcher if he/she needs.*/
-        if(clone.getFileSize() != cloudlet.getFileSize()){
-            sb.append("file size: ")
-              .append(Conversion.bytesToSuitableUnit(cloudlet.getFileSize())).append(" -> ")
-              .append(Conversion.bytesToSuitableUnit(clone.getFileSize())).append(" | ");
-            cloudlet.setFileSize(clone.getFileSize());
-        }
-        if(clone.getNumberOfPes() != cloudlet.getNumberOfPes()){
-            sb.append("PEs: ")
-              .append(cloudlet.getNumberOfPes()).append(" -> ")
-              .append(clone.getNumberOfPes()).append(" | ");
-            cloudlet.setNumberOfPes(clone.getNumberOfPes());
-        }
-        if(clone.getUtilizationOfCpu() != cloudlet.getUtilizationOfCpu()){
-            sb.append("CPU Utilization: ")
-              .append(String.format("%.2f", cloudlet.getUtilizationOfCpu()*100)).append("% -> ")
-              .append(String.format("%.2f", clone.getUtilizationOfCpu()*100)).append("% | ");
-            cloudlet.setUtilizationModelCpu(clone.getUtilizationModelCpu());
-        }
-        if(clone.getUtilizationOfRam() != cloudlet.getUtilizationOfRam()){
-            sb.append("RAM Utilization: ")
-              .append(String.format("%.2f", cloudlet.getUtilizationOfRam()*100)).append("% -> ")
-              .append(String.format("%.2f", clone.getUtilizationOfRam()*100)).append("% | ");
-            cloudlet.setUtilizationModelRam(clone.getUtilizationModelRam());
-        }
-
-        if(sb.length() > 0){
-            logger.trace("{}: {}: {} attributes updated: {}",  getSimulation().clock(), getName(), cloudlet, sb);
-        }
-
-        return cloudlet;
     }
 
     /**
