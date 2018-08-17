@@ -225,23 +225,15 @@ public class GoogleTaskEventsExample1 {
         The trace doesn't define the actual number of CPU cores (PEs) a Cloudlet will require,
         but just a percentage of the number of CPU cores that is required.
         This way, we have to compute the actual number of cores.
-        This is different from the CPU UtilizationModel.
-        The trace doesn't define any information about the percentage of the CPU the Cloudlet
-        will use. This way, the CPU UtilizationModel have to be defined
-        as desired by the researcher.
-
-        However, nothing stops the researcher to interpret this value in a different way,
-        defining the number of PEs for each Cloudlet as he/she wants and use the value read from the trace
-        as the percentage that the PEs will be used along the time.
-        To use this approach, just comment the next two lines and uncomment the other two.
-         */
-        final long pesNumber = (long) Math.ceil(event.getCpuCoresPercent() * VM_PES);
+        This is different from the CPU UtilizationModel, which is defined
+        in the "task usage" trace files.
+        While such files are not processed, the CPU utilization is defined as full (100% of utilization).
+        */
+        final long pesNumber = (long) Math.ceil(event.getMaxCpuCoresPercent() * VM_PES);
         final UtilizationModel utilizationCpu = new UtilizationModelFull();
-        //final long pesNumber = VM_PES/2;
-        //final UtilizationModel utilizationCpu = new UtilizationModelDynamic(attr.getCpuCoresPercent());
 
-        final UtilizationModel utilizationRam = new UtilizationModelDynamic(event.getRamPercent());
-        final long sizeInBytes = (long) Math.ceil(Conversion.megaBytesToBytes(event.getDiskSpacePercent() * VM_SIZE));
+        final UtilizationModel utilizationRam = new UtilizationModelDynamic(event.getMaxRamPercent());
+        final long sizeInBytes = (long) Math.ceil(Conversion.megaBytesToBytes(event.getMaxDiskSpacePercent() * VM_SIZE));
         return new CloudletSimple(CLOUDLET_LENGTH, pesNumber)
             .setFileSize(sizeInBytes)
             .setOutputSize(sizeInBytes)

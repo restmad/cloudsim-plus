@@ -427,10 +427,11 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
         * for instance when the task is submitted. It's just know when it starts to execute.
         */
         return event
-                .setCpuCoresPercent(FieldIndex.RESOURCE_REQUEST_FOR_CPU_CORES.getValue(this))
-                .setDiskSpacePercent(FieldIndex.RESOURCE_REQUEST_FOR_LOCAL_DISK_SPACE.getValue(this))
-                .setRamPercent(FieldIndex.RESOURCE_REQUEST_FOR_RAM.getValue(this))
+                .setMaxCpuCoresPercent(FieldIndex.RESOURCE_REQUEST_FOR_CPU_CORES.getValue(this))
+                .setMaxDiskSpacePercent(FieldIndex.RESOURCE_REQUEST_FOR_LOCAL_DISK_SPACE.getValue(this))
+                .setMaxRamPercent(FieldIndex.RESOURCE_REQUEST_FOR_RAM.getValue(this))
                 .setPriority(FieldIndex.PRIORITY.getValue(this))
+                .setSchedulingClass(FieldIndex.SCHEDULING_CLASS.getValue(this))
                 .setUserName(FieldIndex.USERNAME.getValue(this))
                 .setJobId(FieldIndex.JOB_ID.getValue(this))
                 .setTaskIndex(FieldIndex.TASK_INDEX.getValue(this))

@@ -474,11 +474,16 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
      *           Using the ID of the clone, the actual Cloudlet
      *           instance can be found.
      */
-    private void processCloudletAttributesChange(final SimEvent ev){
-        final Cloudlet clone = (Cloudlet)ev.getData();
-        cloudletSubmittedList.stream()
-                             .filter(cloudlet -> cloudlet.getId() == clone.getId()).findFirst()
-                             .ifPresent(cloudlet -> changeCloudletAttributes(cloudlet, clone));
+    private void processCloudletAttributesChange(final SimEvent ev) {
+        final Cloudlet clone = (Cloudlet) ev.getData();
+        final boolean isNotPresent = !cloudletSubmittedList.stream()
+            .filter(cloudlet -> cloudlet.getId() == clone.getId()).findFirst()
+            .map(cloudlet -> changeCloudletAttributes(cloudlet, clone))
+            .isPresent();
+
+        if(isNotPresent){
+            logger.warn("{}: {}: Request to update {} attributes received but the Cloudlet was not found.",  getSimulation().clock(), getName(), clone);
+        }
     }
 
     /**
@@ -486,8 +491,9 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
      * be changed in the given Cloudlet.
      * @param cloudlet the Cloudlet to change its attributes
      * @param clone the clone containing the values to change in the given Cloudlet
+     * @return the same given Cloudlet
      */
-    private void changeCloudletAttributes(final Cloudlet cloudlet, final Cloudlet clone){
+    private Cloudlet changeCloudletAttributes(final Cloudlet cloudlet, final Cloudlet clone){
         final StringBuilder sb = new StringBuilder();
         /* The output size doesn't always have a relation with file size.
          * This way, if the file size is changed, we don't change
@@ -518,8 +524,10 @@ public abstract class DatacenterBrokerAbstract extends CloudSimEntity implements
         }
 
         if(sb.length() > 0){
-            logger.trace("{}: {}: {} attributes updated: {}",  getSimulation().clock(), getClass().getSimpleName(), cloudlet, sb);
+            logger.trace("{}: {}: {} attributes updated: {}",  getSimulation().clock(), getName(), cloudlet, sb);
         }
+
+        return cloudlet;
     }
 
     /**

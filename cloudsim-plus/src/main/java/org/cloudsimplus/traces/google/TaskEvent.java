@@ -55,9 +55,10 @@ public final class TaskEvent {
     private int jobId;
     private int taskIndex;
     private int priority;
-    private double cpuCoresPercent;
-    private double ramPercent;
-    private double diskSpacePercent;
+    private int schedulingClass;
+    private double maxCpuCoresPercent;
+    private double maxRamPercent;
+    private double maxDiskSpacePercent;
     private int machineId;
     private String userName;
     private double timestamp;
@@ -80,12 +81,12 @@ public final class TaskEvent {
      * @return
      * @see GoogleTaskEventsTraceReader.FieldIndex#RESOURCE_REQUEST_FOR_CPU_CORES
      */
-    public double getCpuCoresPercent() {
-        return cpuCoresPercent;
+    public double getMaxCpuCoresPercent() {
+        return maxCpuCoresPercent;
     }
 
-    protected TaskEvent setCpuCoresPercent(final double cpuCoresPercent) {
-        this.cpuCoresPercent = cpuCoresPercent;
+    protected TaskEvent setMaxCpuCoresPercent(final double maxCpuCoresPercent) {
+        this.maxCpuCoresPercent = maxCpuCoresPercent;
         return this;
     }
 
@@ -95,12 +96,12 @@ public final class TaskEvent {
      * @return
      * @see GoogleTaskEventsTraceReader.FieldIndex#RESOURCE_REQUEST_FOR_RAM
      */
-    public double getRamPercent() {
-        return ramPercent;
+    public double getMaxRamPercent() {
+        return maxRamPercent;
     }
 
-    protected TaskEvent setRamPercent(final double ramPercent) {
-        this.ramPercent = ramPercent;
+    protected TaskEvent setMaxRamPercent(final double maxRamPercent) {
+        this.maxRamPercent = maxRamPercent;
         return this;
     }
 
@@ -110,8 +111,8 @@ public final class TaskEvent {
      * @return
      * @see GoogleTaskEventsTraceReader.FieldIndex#RESOURCE_REQUEST_FOR_LOCAL_DISK_SPACE
      */
-    public double getDiskSpacePercent() {
-        return diskSpacePercent;
+    public double getMaxDiskSpacePercent() {
+        return maxDiskSpacePercent;
     }
 
     /**
@@ -124,8 +125,8 @@ public final class TaskEvent {
         return machineId;
     }
 
-    protected TaskEvent setDiskSpacePercent(final double diskSpacePercent) {
-        this.diskSpacePercent = diskSpacePercent;
+    protected TaskEvent setMaxDiskSpacePercent(final double maxDiskSpacePercent) {
+        this.maxDiskSpacePercent = maxDiskSpacePercent;
         return this;
     }
 
@@ -196,6 +197,23 @@ public final class TaskEvent {
 
     protected TaskEvent setTimestamp(final double timestamp) {
         this.timestamp = timestamp;
+        return this;
+    }
+
+    /**
+     * Gets the  s​cheduling class ​that roughly represents how latency-sensitive the task is.
+     * The scheduling class is represented by a single number,
+     * with 3 representing a more latency-sensitive task (e.g., serving revenue-generating user requests)
+     * and 0 representing a non-production task (e.g., development, non-business-critical analyses, etc.).
+     * @return
+     * @see GoogleTaskEventsTraceReader.FieldIndex#SCHEDULING_CLASS
+     */
+    public int getSchedulingClass() {
+        return schedulingClass;
+    }
+
+    protected TaskEvent setSchedulingClass(final int schedulingClass) {
+        this.schedulingClass = schedulingClass;
         return this;
     }
 }
