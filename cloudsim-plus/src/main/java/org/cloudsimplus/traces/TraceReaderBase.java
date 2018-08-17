@@ -64,7 +64,19 @@ public abstract class TraceReaderBase extends TraceReaderAbstract {
     }
 
     /**
-     * Gets a field's value from the {@link #getLastParsedLineArray() last parsed line} as int.
+     * Gets a field's value from the {@link #getLastParsedLineArray() last parsed line} as double.
+     *
+     * @param field a enum value representing the index of the field to get the value
+     * @param defaultValue the default value to be returned if the field value is not a number
+     * @return
+     */
+    protected <T extends Enum> double getFieldDoubleValue(final T field, final double defaultValue){
+        final String value = getFieldValue(field);
+        return  value.matches("^-?\\d+(\\.?\\d+)?$") ? Double.parseDouble(value) : defaultValue;
+    }
+
+    /**
+     * Gets a field's value from the {@link #getLastParsedLineArray() last parsed line} as an int.
      *
      * @param field a enum value representing the index of the field to get the value
      * @return
@@ -74,15 +86,15 @@ public abstract class TraceReaderBase extends TraceReaderAbstract {
     }
 
     /**
-     * Gets a field's value from the {@link #getLastParsedLineArray() last parsed line} as int.
+     * Gets a field's value from the {@link #getLastParsedLineArray() last parsed line} as an int.
      *
      * @param field a enum value representing the index of the field to get the value
-     * @param defaultValue the default value to be returned if the field value is not a number
+     * @param defaultValue the default value to be returned if the field value is not an int
      * @return
      */
     protected <T extends Enum> int getFieldIntValue(final T field, final int defaultValue){
         final String value = getFieldValue(field);
-        return  value.matches("-?\\d+") ? Integer.parseInt(value) : defaultValue;
+        return  value.matches("^-?\\d+$") ? Integer.parseInt(value) : defaultValue;
     }
 
     /**

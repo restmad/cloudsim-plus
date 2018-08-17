@@ -113,9 +113,26 @@ public class UtilizationModelDynamic extends UtilizationModelAbstract {
      *                           on the {@code unit} parameter
      */
     public UtilizationModelDynamic(final Unit unit, final double initialUtilization) {
+        this(unit, initialUtilization, unit == Unit.PERCENTAGE ? Conversion.HUNDRED_PERCENT : 0);
+    }
+
+    /**
+     * Creates a UtilizationModelDynamic that the initial resource utilization,
+     * max resource utilization and the {@link Unit}
+     * will be defined according to the given parameters.
+     *
+     * <p><b>The utilization will not be dynamically incremented
+     * until that an increment function is defined by the {@link #setUtilizationUpdateFunction(Function)}.</b></p>
+     * @param unit the {@link Unit} that determines how the resource is used (for instance, if
+     *             resource usage is defined in percentage of the Vm resource or in absolute values)
+     * @param initialUtilization the initial of resource utilization, that the unit depends
+     *                           on the {@code unit} parameter
+     * @param maxResourceUtilization the maximum resource utilization
+     */
+    public UtilizationModelDynamic(final Unit unit, final double initialUtilization, final double maxResourceUtilization) {
         super(unit);
         this.readOnly = false;
-        this.maxResourceUtilization = (unit == Unit.PERCENTAGE ? Conversion.HUNDRED_PERCENT : 0);
+        this.setMaxResourceUtilization(maxResourceUtilization);
         this.previousUtilizationTime = 0;
         this.currentUtilizationTime = 0;
         this.setCurrentUtilization(initialUtilization);
@@ -220,7 +237,7 @@ public class UtilizationModelDynamic extends UtilizationModelAbstract {
     }
 
     /**
-     * Sets the maximum amount of resource of resource that will be used.
+     * Sets the maximum amount of resource that will be used.
      *
      * <p>Such a value can be a percentage in scale from [0 to 1] or an absolute value,
      * depending on the {@link #getUnit()}.</p>

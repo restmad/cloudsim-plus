@@ -43,8 +43,8 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Process "machine events" from
- * <a href="https://github.com/google/cluster-data/blob/master/ClusterData2011_2.md">Google Cluster trace files</a>.
+ * Process "machine events" trace files from
+ * <a href="https://github.com/google/cluster-data/blob/master/ClusterData2011_2.md">Google Cluster Data</a>.
  * When a trace file is {@link #process() processed}, it creates a list of available {@link Host}s for every line with a zero timestamp
  * and the {@link #getEventType() event type} equals to {@link MachineEventType#ADD}, meaning
  * that such Hosts will be immediately available at the simulation start.
@@ -183,7 +183,7 @@ public final class GoogleMachineEventsTraceReader extends GoogleTraceReaderAbstr
     private final List<Host> hostsForRemoval;
 
     /**
-     * Gets a {@link GoogleMachineEventsTraceReader} instance from a trace file
+     * Gets a {@link GoogleMachineEventsTraceReader} instance to read a "machine events" trace file
      * inside the <b>application's resource directory</b>.
      * Created Hosts will have 16GB of maximum RAM and the maximum of 8 {@link Pe}s.
      * Use the available constructors if you want to load a file outside the resource directory.
@@ -208,8 +208,8 @@ public final class GoogleMachineEventsTraceReader extends GoogleTraceReaderAbstr
     }
 
     /**
-     * Instantiates a GoogleMachineEventsTraceReader from a given trace file path,
-     * where the maximum RAM will be 16GB and the maximum number of {@link Pe}s will be 8.
+     * Instantiates a GoogleMachineEventsTraceReader to read a "machine events" trace file.
+     * Created Hosts will have 16GB of maximum RAM and the maximum of 8 {@link Pe}s.
      *
      * @param filePath           the path to the trace file
      * @param hostCreationFunction A {@link Function} that will be called for every {@link Host} to be created
@@ -230,8 +230,8 @@ public final class GoogleMachineEventsTraceReader extends GoogleTraceReaderAbstr
     }
 
     /**
-     * Instantiates a GoogleMachineEventsTraceReader from a given InputStream,
-     * where the maximum RAM will be 16GB and the maximum number of {@link Pe}s will be 8.
+     * Instantiates a GoogleMachineEventsTraceReader to read a "machine events" from a given InputStream.
+     * Created Hosts will have 16GB of maximum RAM and the maximum of 8 {@link Pe}s.
      *
      * @param filePath           the path to the trace file
      * @param reader             a {@link InputStream} object to read the file

@@ -62,6 +62,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.cloudbus.cloudsim.utilizationmodels.UtilizationModel.Unit;
+
 /**
  * An example showing how to create Cloudlets (tasks) from a Google Task Events Trace
  * using a {@link GoogleTaskEventsTraceReader}.
@@ -229,11 +231,19 @@ public class GoogleTaskEventsExample1 {
         in the "task usage" trace files.
         While such files are not processed, the CPU utilization is defined as full (100% of utilization).
         */
-        final long pesNumber = (long) Math.ceil(event.getMaxCpuCoresPercent() * VM_PES);
+        final long pesNumber = event.getActualCpuCores(VM_PES) > 0 ? event.getActualCpuCores(VM_PES) : VM_PES;
+
+        /* Since this example is not reading a "task usage" trace, the CPU utilization rate
+         * is defined manually. In this case, the allocated PEs will be used 100% all the time .*/
         final UtilizationModel utilizationCpu = new UtilizationModelFull();
 
-        final UtilizationModel utilizationRam = new UtilizationModelDynamic(event.getMaxRamPercent());
-        final long sizeInBytes = (long) Math.ceil(Conversion.megaBytesToBytes(event.getMaxDiskSpacePercent() * VM_SIZE));
+        final double maxRamUsagePercent = event.getResourceRequestForRam() > 0 ? event.getResourceRequestForRam() : Conversion.HUNDRED_PERCENT;
+        final UtilizationModelDynamic utilizationRam = new UtilizationModelDynamic(Unit.PERCENTAGE, 0, maxRamUsagePercent);
+        /* Since this example is not reading a "task usage" trace, the RAM utilization
+         * is defined manually. In this case, it will be incremented along the time.*/
+        utilizationRam.setUtilizationUpdateFunction(um -> um.getUtilization() + um.getTimeSpan()*0.1);
+
+        final long sizeInBytes = (long) Math.ceil(Conversion.megaBytesToBytes(event.getResourceRequestForLocalDiskSpace()*VM_SIZE + 1));
         return new CloudletSimple(CLOUDLET_LENGTH, pesNumber)
             .setFileSize(sizeInBytes)
             .setOutputSize(sizeInBytes)

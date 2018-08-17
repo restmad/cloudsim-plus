@@ -32,6 +32,7 @@ import org.cloudbus.cloudsim.core.Simulation;
 import org.cloudbus.cloudsim.core.events.CloudSimEvent;
 import org.cloudbus.cloudsim.util.Conversion;
 import org.cloudbus.cloudsim.util.ResourceLoader;
+import org.cloudbus.cloudsim.utilizationmodels.UtilizationModelDynamic;
 import org.cloudsimplus.listeners.EventInfo;
 
 import java.io.FileInputStream;
@@ -45,8 +46,8 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Process "task events" from
- * <a href="https://github.com/google/cluster-data/blob/master/ClusterData2011_2.md">Google Cluster trace files</a>
+ * Process "task events" trace files from
+ * <a href="https://github.com/google/cluster-data/blob/master/ClusterData2011_2.md">Google Cluster Data</a>
  * to create {@link Cloudlet}s belonging to cloud customers (users).
  * Customers are represented as {@link DatacenterBroker} instances created from the trace file.
  * The trace files are the ones inside the task_events sub-directory of downloaded Google traces.
@@ -67,18 +68,6 @@ import static java.util.Objects.requireNonNull;
  * @since CloudSim Plus 4.0.0
  */
 public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract<Cloudlet> {
-    /**
-     * List of messages to send to the {@link DatacenterBroker} that owns each created Cloudlet.
-     * Such events request a Cloudlet's status change or attributes change.
-     * @see #addCloudletStatusChangeEvents(CloudSimEvent, TaskEvent)
-     */
-    private final List<CloudSimEvent> cloudletStatusChangeEvents;
-
-    /**
-     * @see #setCloudletCreationFunction(Function)
-     */
-    private Function<TaskEvent, Cloudlet> cloudletCreationFunction;
-
     /**
      * Defines the type of information missing in the trace file.
      * It represents the possible values for the MISSING_INFO field.
@@ -134,11 +123,14 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
          * and synthesize a missing record if we don't find one.
          * Synthesized records have a number (called the "missing info" field)
          * to represent why they were added to the trace, according to {@link MissingInfo} values.
+         *
+         * <p>When there is no info missing, the field is empty in the trace.
+         * In this case, -1 is returned instead.</p>
          */
         MISSING_INFO{
             @Override
             public Integer getValue(final GoogleTaskEventsTraceReader reader) {
-                return reader.getFieldIntValue(this);
+                return reader.getFieldIntValue(this, -1);
             }
         },
 
@@ -242,33 +234,39 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
         /**
          * 9: The index of the field containing the maximum number of CPU cores
          * the task is permitted to use (in percentage from 0 to 1).
+         *
+         * <p>When there is no value for the field, 0 is returned instead.</p>
          */
         RESOURCE_REQUEST_FOR_CPU_CORES{
             @Override
             public Double getValue(final GoogleTaskEventsTraceReader reader) {
-                return reader.getFieldDoubleValue(this);
+                return reader.getFieldDoubleValue(this, 0);
             }
         },
 
         /**
          * 10: The index of the field containing the maximum amount of RAM
          * the task is permitted to use (in percentage from 0 to 1).
+         *
+         * <p>When there is no value for the field, 0 is returned instead.</p>
          */
         RESOURCE_REQUEST_FOR_RAM{
             @Override
             public Double getValue(final GoogleTaskEventsTraceReader reader) {
-                return reader.getFieldDoubleValue(this);
+                return reader.getFieldDoubleValue(this, 0);
             }
         },
 
         /**
          * 11: The index of the field containing the maximum amount of local disk space
          * the task is permitted to use (in percentage from 0 to 1).
+         *
+         * <p>When there is no value for the field, 0 is returned instead.</p>
          */
         RESOURCE_REQUEST_FOR_LOCAL_DISK_SPACE{
             @Override
             public Double getValue(final GoogleTaskEventsTraceReader reader) {
-                return reader.getFieldDoubleValue(this);
+                return reader.getFieldDoubleValue(this, 0);
             }
         },
 
@@ -277,16 +275,31 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
          * it indicates that a task must be scheduled to execute on a
          * different machine than any other currently running task in the job.
          * It is a special type of constraint.
+         *
+         * <p>When there is no value for the field, -1 is returned instead.</p>
          */
         DIFFERENT_MACHINE_CONSTRAINT{
             @Override
             public Integer getValue(final GoogleTaskEventsTraceReader reader) {
-                return reader.getFieldIntValue(this);
+                return reader.getFieldIntValue(this, -1);
             }
         }
     }
 
-    /** A map of brokers created according to the username from the trace file,
+    /**
+     * List of messages to send to the {@link DatacenterBroker} that owns each created Cloudlet.
+     * Such events request a Cloudlet's status change or attributes change.
+     * @see #addCloudletStatusChangeEvents(CloudSimEvent, TaskEvent)
+     */
+    private final List<CloudSimEvent> cloudletStatusChangeEvents;
+
+    /**
+     * @see #setCloudletCreationFunction(Function)
+     */
+    private Function<TaskEvent, Cloudlet> cloudletCreationFunction;
+
+    /**
+     * A map of brokers created according to the username from the trace file,
      * representing a customer. Each key is the username field and the value the created broker.
      * @see #getBrokers()
      */
@@ -295,7 +308,7 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
     private CloudSim simulation;
 
     /**
-     * Gets a {@link GoogleTaskEventsTraceReader} instance from a trace file
+     * Gets a {@link GoogleTaskEventsTraceReader} instance to read a "task events" trace file
      * inside the <b>application's resource directory</b>.
      *
      * @param simulation the simulation instance that the created tasks and brokers will belong to.
@@ -318,8 +331,7 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
     }
 
     /**
-     * Gets a {@link GoogleTaskEventsTraceReader} instance from a trace file
-     * inside the <b>application's resource directory</b>.
+     * Instantiates a {@link GoogleTaskEventsTraceReader} to read a "task events" file.
      *
      * @param simulation the simulation instance that the created tasks and brokers will belong to.
      * @param filePath               the workload trace <b>relative file name</b> in one of the following formats: <i>ASCII text, zip, gz.</i>
@@ -340,7 +352,7 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
     }
 
     /**
-     * Gets a {@link GoogleTaskEventsTraceReader} instance from a given InputStream.
+     * Instantiates a {@link GoogleTaskEventsTraceReader} to read a "task events" from a given InputStream.
      *
      * @param simulation the simulation instance that the created tasks and brokers will belong to.
      * @param filePath               the workload trace <b>relative file name</b> in one of the following formats: <i>ASCII text, zip, gz.</i>
@@ -396,7 +408,7 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
 
     /**
      * Adds an event listener that is notified when the simulation starts,
-     * so that the messages to change Cloudlet status are send.
+     * so that the messages to change Cloudlet status are sent.
      *
      * @param info the simulation start event information
      */
@@ -427,9 +439,9 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
         * for instance when the task is submitted. It's just know when it starts to execute.
         */
         return event
-                .setMaxCpuCoresPercent(FieldIndex.RESOURCE_REQUEST_FOR_CPU_CORES.getValue(this))
-                .setMaxDiskSpacePercent(FieldIndex.RESOURCE_REQUEST_FOR_LOCAL_DISK_SPACE.getValue(this))
-                .setMaxRamPercent(FieldIndex.RESOURCE_REQUEST_FOR_RAM.getValue(this))
+                .setResourceRequestForCpuCores(FieldIndex.RESOURCE_REQUEST_FOR_CPU_CORES.getValue(this))
+                .setResourceRequestForLocalDiskSpace(FieldIndex.RESOURCE_REQUEST_FOR_LOCAL_DISK_SPACE.getValue(this))
+                .setResourceRequestForRam(FieldIndex.RESOURCE_REQUEST_FOR_RAM.getValue(this))
                 .setPriority(FieldIndex.PRIORITY.getValue(this))
                 .setSchedulingClass(FieldIndex.SCHEDULING_CLASS.getValue(this))
                 .setUserName(FieldIndex.USERNAME.getValue(this))
@@ -493,61 +505,80 @@ public final class GoogleTaskEventsTraceReader extends GoogleTraceReaderAbstract
         provided function so that the correct objects for such attributes
         are created and then set to the Cloudlet being updated.
          */
-        final Cloudlet clone = cloudletCreationFunction.apply(taskEvent);
+        final Cloudlet clone = createCloudlet(taskEvent);
         clone.setId(cloudlet.getId());
 
-        /*If some attribute of the Cloudlet that needs to be changed,
+        /* If some attribute of the Cloudlet that needs to be changed,
          * sends a message requesting the change.*/
         if(!areCloudletAttributesDifferent(cloudlet, clone)){
             return cloudlet;
         }
 
-        /*Defines a Runnable that will be executed when
-        * the message is processed by the broker to update the Cloudlet attributes.*/
+        /* Defines a Runnable that will be executed when
+         * the message is processed by the broker to update the Cloudlet attributes.
+         * The "resource request" fields define the max amount of a resource the Cloudlet
+         * is allowed to used and they are just used to define
+         * initial number of CPUs, RAM utilization and Cloudlet file size/output size.
+         * This way, when they change along the time in the trace,
+         * these new values are ignored because
+         */
         final Runnable attributesUpdateRunnable = () -> {
             final DatacenterBroker broker = cloudlet.getBroker();
             final StringBuilder sb = new StringBuilder();
             /* The output size doesn't always have a relation with file size.
              * This way, if the file size is changed, we don't change
              * the output size. This may be performed by the researcher if he/she needs.*/
-            if(clone.getFileSize() != cloudlet.getFileSize()){
-                sb.append("file size: ")
-                  .append(Conversion.bytesToSuitableUnit(cloudlet.getFileSize())).append(" -> ")
-                  .append(Conversion.bytesToSuitableUnit(clone.getFileSize())).append(" | ");
+            if(clone.getPriority() != cloudlet.getPriority()){
+                sb.append("priority: ")
+                    .append(cloudlet.getPriority()).append(" -> ")
+                    .append(clone.getPriority()).append(" | ");
                 cloudlet.setFileSize(clone.getFileSize());
             }
+
             if(clone.getNumberOfPes() != cloudlet.getNumberOfPes()){
                 sb.append("PEs: ")
-                  .append(cloudlet.getNumberOfPes()).append(" -> ")
-                  .append(clone.getNumberOfPes()).append(" | ");
+                    .append(cloudlet.getNumberOfPes()).append(" -> ")
+                    .append(clone.getNumberOfPes()).append(" | ");
                 cloudlet.setNumberOfPes(clone.getNumberOfPes());
             }
-            if(clone.getUtilizationOfCpu() != cloudlet.getUtilizationOfCpu()){
-                sb.append("CPU Utilization: ")
-                  .append(String.format("%.2f", cloudlet.getUtilizationOfCpu()*100)).append("% -> ")
-                  .append(String.format("%.2f", clone.getUtilizationOfCpu()*100)).append("% | ");
-                cloudlet.setUtilizationModelCpu(clone.getUtilizationModelCpu());
+
+            //It's ensured when creating the Cloudlet that a UtilizationModelDynamic is used for RAM
+            final UtilizationModelDynamic cloneRamUM = (UtilizationModelDynamic)clone.getUtilizationModelRam();
+            final UtilizationModelDynamic cloudletRamUM = (UtilizationModelDynamic)cloudlet.getUtilizationModelRam();
+            if(cloneRamUM.getMaxResourceUtilization() != cloudletRamUM.getMaxResourceUtilization()){
+                sb.append("Max RAM Usage: ")
+                    .append(cloudletRamUM.getMaxResourceUtilization()).append(" -> ")
+                    .append(cloneRamUM.getMaxResourceUtilization()).append(" | ");
+                cloudletRamUM.setMaxResourceUtilization(cloneRamUM.getMaxResourceUtilization());
             }
-            if(clone.getUtilizationOfRam() != cloudlet.getUtilizationOfRam()){
-                sb.append("RAM Utilization: ")
-                  .append(String.format("%.2f", cloudlet.getUtilizationOfRam()*100)).append("% -> ")
-                  .append(String.format("%.2f", clone.getUtilizationOfRam()*100)).append("% | ");
-                cloudlet.setUtilizationModelRam(clone.getUtilizationModelRam());
-            }
+
             broker.logger.trace("{}: {}: {} attributes updated: {}", getSimulation().clock(), broker.getName(), cloudlet, sb);
         };
 
-        /*The Runnable is the data of the event that is sent to the broker,
-        * this way, it will be executed only when the event is processed.*/
+        /* The Runnable is the data of the event that is sent to the broker,
+         * this way, it will be executed only when the event is processed.*/
         final CloudSimEvent attrsChangeSimEvt =
             new CloudSimEvent(
                 simulation, taskEvent.getTimestamp(),
                 statusChangeSimEvt.getDestination(),
                 CloudSimTags.CLOUDLET_UPDATE_ATTRIBUTES, attributesUpdateRunnable);
+
         //Sends the event to change the Cloudlet attributes
         cloudletStatusChangeEvents.add(attrsChangeSimEvt);
 
         return cloudlet;
+    }
+
+    protected Cloudlet createCloudlet(final TaskEvent taskEvent) {
+        final Cloudlet cloudlet = cloudletCreationFunction.apply(taskEvent);
+        if(cloudlet.getUtilizationModelRam() instanceof UtilizationModelDynamic) {
+            return cloudlet;
+        }
+
+        throw new IllegalStateException(
+            "Since the 'task events' trace file provides a field defining the max RAM the Cloudlet can request, " +
+            "it's required to use a UtilizationModelDynamic for the Cloudlet's RAM utilization model, " +
+            "so that the UtilizationModelDynamic.maxResourceUtilization attribute can be changed when defined in the trace file.");
     }
 
     private boolean areCloudletAttributesDifferent(final Cloudlet cloudlet1, final Cloudlet cloudlet2) {

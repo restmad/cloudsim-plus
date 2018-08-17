@@ -46,21 +46,21 @@ public enum TaskEventType {
     SUBMIT{
         @Override
         protected boolean process(final GoogleTaskEventsTraceReader reader) {
-            final TaskEvent attrs = reader.createTaskEventFromTraceLine();
-            final Cloudlet c = reader.getCloudletCreationFunction().apply(attrs);
-            c.setId(attrs.getUniqueTaskId());
-            c.setJobId(attrs.getJobId());
+            final TaskEvent event = reader.createTaskEventFromTraceLine();
+            final Cloudlet c = reader.createCloudlet(event);
+            c.setId(event.getUniqueTaskId());
+            c.setJobId(event.getJobId());
             final double delay = FieldIndex.TIMESTAMP.getValue(reader);
             c.setSubmissionDelay(delay);
 
             // Since Cloudlet id must be unique, it will be the concatenation of the job and task id
-            c.setId(attrs.getUniqueTaskId());
+            c.setId(event.getUniqueTaskId());
 
             /* Set status to FROZEN to avoid the cloudlet to start running after being submitted.
             The execution must start only after a SCHEDULE event happens. */
             c.setStatus(Cloudlet.Status.FROZEN);
 
-            DatacenterBroker broker = reader.createBrokerIfAbsent(attrs.getUserName());
+            DatacenterBroker broker = reader.createBrokerIfAbsent(event.getUserName());
             broker.submitCloudlet(c);
             return reader.addAvailableCloudlet(c);
         }
